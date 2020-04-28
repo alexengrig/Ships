@@ -1,8 +1,6 @@
 package dev.alexengrig.ships.domain;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class Ship<T> {
     private final int capacity;
@@ -38,5 +36,28 @@ public class Ship<T> {
 
     public List<Goods<T>> getGoods() {
         return Collections.unmodifiableList(values);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Ship<?> ship = (Ship<?>) o;
+        return capacity == ship.capacity &&
+                values.equals(ship.values);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(capacity, values);
+    }
+
+    @Override
+    public String toString() {
+        StringJoiner joiner = new StringJoiner(",");
+        for (Goods<T> goods : values) {
+            joiner.add(goods.toString());
+        }
+        return String.format("\\%s/%d/%d", joiner, values.size(), capacity);
     }
 }
