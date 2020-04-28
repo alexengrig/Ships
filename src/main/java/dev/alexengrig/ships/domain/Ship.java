@@ -32,6 +32,10 @@ public class Ship<T> {
         return values.add(goods);
     }
 
+    public boolean addGoods(List<Goods<T>> goods) {
+        return values.addAll(goods);
+    }
+
     public List<Goods<T>> getGoods() {
         return Collections.unmodifiableList(values);
     }
