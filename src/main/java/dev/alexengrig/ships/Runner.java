@@ -7,7 +7,11 @@ import dev.alexengrig.ships.factory.FoodShipFactory;
 import dev.alexengrig.ships.generator.RandomFoodGenerator;
 import dev.alexengrig.ships.generator.RandomFoodShipGenerator;
 import dev.alexengrig.ships.generator.ShipGenerator;
+import dev.alexengrig.ships.loader.ShipLoader;
 import dev.alexengrig.ships.loader.SlowShipLoader;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class Runner {
     public static void main(String[] args) {
@@ -15,14 +19,32 @@ public class Runner {
         Ship<Food> ship = producer.generate();
         System.out.println("Before load:");
         System.out.println(ship);
-        SlowShipLoader<Food> consumer = createLoader();
-        consumer.load(ship);
+        Tunnel<Food> tunnel = createTunnel();
+        tunnel.push(ship);
+        ShipLoader<Food> consumer = createLoader();
+        consumer.load(tunnel.pull());
         System.out.println("After load:");
         System.out.println(ship);
     }
 
-    public static SlowShipLoader<Food> createLoader() {
+    private static ShipLoader<Food> createLoader() {
         return new SlowShipLoader<>(new RandomFoodGenerator(new FoodFactory()));
+    }
+
+    private static Tunnel<Food> createTunnel() {
+        return new Tunnel<Food>() {
+            private final List<Ship<Food>> list = new ArrayList<>();
+
+            @Override
+            public void push(Ship<Food> ship) {
+                list.add(ship);
+            }
+
+            @Override
+            public Ship<Food> pull() {
+                return list.get(0);
+            }
+        };
     }
 
     private static ShipGenerator<Food> createGenerator() {
