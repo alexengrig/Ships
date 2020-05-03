@@ -3,7 +3,7 @@ package dev.alexengrig.ships.tunnel;
 import dev.alexengrig.ships.domain.Ship;
 
 public interface ShipTunnel<T> {
-    void push(Ship<T> ship);
+    void put(Ship<T> ship) throws InterruptedException;
 
-    Ship<T> pull();
+    Ship<T> take() throws InterruptedException;
 }
