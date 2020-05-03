@@ -9,46 +9,54 @@ import dev.alexengrig.ships.generator.RandomFoodShipGenerator;
 import dev.alexengrig.ships.generator.ShipGenerator;
 import dev.alexengrig.ships.loader.ShipLoader;
 import dev.alexengrig.ships.loader.SlowShipLoader;
+import dev.alexengrig.ships.tunnel.ShipArrayBlockingQueue;
 import dev.alexengrig.ships.tunnel.ShipTunnel;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class Runner {
-    public static void main(String[] args) {
-        ShipGenerator<Food> producer = createGenerator();
-        Ship<Food> ship = producer.generate();
-        System.out.println("Before load:");
-        System.out.println(ship);
-        ShipTunnel<Food> tunnel = createTunnel();
-        tunnel.push(ship);
-        ShipLoader<Food> consumer = createLoader();
-        consumer.load(tunnel.pull());
-        System.out.println("After load:");
-        System.out.println(ship);
-    }
+    public static void main(String[] args) throws InterruptedException {
+        System.out.println("Started");
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        int shipCount = 10;
+        ShipTunnel<Food> tunnel = new ShipArrayBlockingQueue<>(1);
 
-    private static ShipLoader<Food> createLoader() {
-        return new SlowShipLoader<>(new RandomFoodGenerator(new FoodFactory()));
-    }
-
-    private static ShipTunnel<Food> createTunnel() {
-        return new ShipTunnel<Food>() {
-            private final List<Ship<Food>> list = new ArrayList<>();
-
-            @Override
-            public void push(Ship<Food> ship) {
-                list.add(ship);
+        ShipGenerator<Food> generator = new RandomFoodShipGenerator(new FoodShipFactory(), 1, 2);
+        executorService.execute(() -> {
+            System.out.println("Generator started");
+            Ship<Food> ship;
+            for (int i = 0; i < shipCount; i++) {
+                ship = generator.generate();
+                try {
+                    tunnel.put(ship);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                System.out.println("Generated: " + ship);
             }
+            System.out.println("Generator finished");
+        });
 
-            @Override
-            public Ship<Food> pull() {
-                return list.get(0);
+        ShipLoader<Food> loader = new SlowShipLoader<>(new RandomFoodGenerator(new FoodFactory()));
+        executorService.execute(() -> {
+            System.out.println("Loader started");
+            Ship<Food> ship;
+            for (int i = 0; i < shipCount; i++) {
+                try {
+                    ship = tunnel.take();
+                } catch (InterruptedException e) {
+                    return;
+                }
+                loader.load(ship);
+                System.out.println("Loaded: " + ship);
             }
-        };
-    }
+            System.out.println("Loader finished");
+        });
 
-    private static ShipGenerator<Food> createGenerator() {
-        return new RandomFoodShipGenerator(new FoodShipFactory(), 1, 5);
+        executorService.shutdown();
+        executorService.awaitTermination(60, TimeUnit.SECONDS);
+        System.out.println("Finished");
     }
 }
