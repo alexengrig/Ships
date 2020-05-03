@@ -17,14 +17,14 @@ public class ShipSynchronizedQueue<T> extends LimitedShipTunnel<T> {
     public synchronized void put(Ship<T> ship) throws InterruptedException {
         while (limit == queue.size()) wait();
         queue.offer(ship);
-        notifyAll();
+        notify();
     }
 
     @Override
     public synchronized Ship<T> take() throws InterruptedException {
         while (queue.isEmpty()) wait();
         Ship<T> ship = queue.poll();
-        notifyAll();
+        notify();
         return ship;
     }
 }
