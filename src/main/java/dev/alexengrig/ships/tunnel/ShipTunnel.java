@@ -1,8 +1,8 @@
-package dev.alexengrig.ships;
+package dev.alexengrig.ships.tunnel;
 
 import dev.alexengrig.ships.domain.Ship;
 
-public interface Tunnel<T> {
+public interface ShipTunnel<T> {
     void push(Ship<T> ship);
 
     Ship<T> pull();
