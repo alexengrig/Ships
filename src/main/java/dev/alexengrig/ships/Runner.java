@@ -12,48 +12,81 @@ import dev.alexengrig.ships.loader.SlowShipLoader;
 import dev.alexengrig.ships.tunnel.ShipArrayBlockingQueue;
 import dev.alexengrig.ships.tunnel.ShipTunnel;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Runner {
     public static void main(String[] args) throws InterruptedException {
         System.out.println("Started");
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
-        int shipCount = 10;
-        ShipTunnel<Food> tunnel = new ShipArrayBlockingQueue<>(1);
+        int count = 5;
+        int producerCount = 2;
+        int consumerCount = 2;
+        int workerCount = producerCount + consumerCount;
+        CountDownLatch latch = new CountDownLatch(workerCount);
+        AtomicInteger generatedCount = new AtomicInteger();
+        AtomicInteger loadedCount = new AtomicInteger();
 
-        ShipGenerator<Food> generator = new RandomFoodShipGenerator(new FoodShipFactory(), 1, 2);
-        executorService.execute(() -> {
-            System.out.println("Generator started");
+        ShipTunnel<Food> queue = new ShipArrayBlockingQueue<>(workerCount / 2);
+        Runnable producer = () -> {
+            latch.countDown();
+            try {
+                latch.await();
+            } catch (InterruptedException ignore) {
+            }
+            long threadId = Thread.currentThread().getId();
+            System.out.println(threadId + " Generator started");
+            ShipGenerator<Food> generator = new RandomFoodShipGenerator(new FoodShipFactory(), 1, 2);
             Ship<Food> ship;
-            for (int i = 0; i < shipCount; i++) {
+            while (generatedCount.getAndIncrement() < count) {
                 ship = generator.generate();
                 try {
-                    tunnel.put(ship);
+                    queue.put(ship);
                 } catch (InterruptedException e) {
                     return;
                 }
-                System.out.println("Generated: " + ship);
+                System.out.println(threadId + " Generated: " + ship);
             }
-            System.out.println("Generator finished");
-        });
-
-        ShipLoader<Food> loader = new SlowShipLoader<>(new RandomFoodGenerator(new FoodFactory()));
-        executorService.execute(() -> {
-            System.out.println("Loader started");
+            System.out.println(threadId + " Generator finished");
+        };
+        Runnable consumer = () -> {
+            latch.countDown();
+            try {
+                latch.await();
+            } catch (InterruptedException ignore) {
+            }
+            long threadId = Thread.currentThread().getId();
+            System.out.println(threadId + " Loader started");
+            ShipLoader<Food> loader = new SlowShipLoader<>(new RandomFoodGenerator(new FoodFactory()));
             Ship<Food> ship;
-            for (int i = 0; i < shipCount; i++) {
+            while (loadedCount.getAndIncrement() < count) {
                 try {
-                    ship = tunnel.take();
+                    ship = queue.take();
                 } catch (InterruptedException e) {
                     return;
                 }
                 loader.load(ship);
-                System.out.println("Loaded: " + ship);
+                System.out.println(threadId + " Loaded: " + ship);
             }
-            System.out.println("Loader finished");
-        });
+            System.out.println(threadId + " Loader finished");
+        };
+
+        ExecutorService executorService = Executors.newFixedThreadPool(workerCount);
+
+        for (int i = 0; i < producerCount; i++) {
+            executorService.execute(producer);
+        }
+        for (int i = 0; i < consumerCount; i++) {
+            executorService.execute(consumer);
+        }
+
+        latch.countDown();
+        try {
+            latch.await();
+        } catch (InterruptedException ignore) {
+        }
 
         executorService.shutdown();
         executorService.awaitTermination(60, TimeUnit.SECONDS);
